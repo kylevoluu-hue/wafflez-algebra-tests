@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wafflez Algebra Calculator</title>
+
+<!-- Symbolic math engine (algebra, calculus, equation solving, exact fractions) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/nerdamer/1.1.13/all.min.js"></script>
+
+<style>
+  :root {
+    --bg:        #1b1f2a;
+    --body:      #2b303f;
+    --screen:    #0e1320;
+    --screen-2:  #121a2c;
+    --num:       #3a4154;
+    --num-hi:    #464e64;
+    --op:        #ff9f43;
+    --op-hi:     #ffb066;
+    --fn:        #4b5bd6;
+    --fn-hi:     #5e6ee8;
+    --act:       #20c997;
+    --act-hi:    #2ee0ac;
+    --clr:       #e74c3c;
+    --clr-hi:    #f6614f;
+    --text:      #f4f6fb;
+    --muted:     #8a93a8;
+    --accent:    #6ee7ff;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at 50% 0%, #2a3550, var(--bg) 60%);
+    font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    padding: 16px;
+  }
+
+  .calculator {
+    width: 380px;
+    max-width: 100%;
+    background: var(--body);
+    border-radius: 26px;
+    padding: 20px;
+    box-shadow: 0 25px 60px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.06);
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: var(--muted);
+    font-size: 12px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin: 2px 4px 12px;
+  }
+  .brand b { color: var(--accent); font-weight: 700; }
+
+  /* ---- Display screen ---- */
+  .screen {
+    background: linear-gradient(180deg, var(--screen-2), var(--screen));
+    border-radius: 16px;
+    padding: 16px 18px;
+    min-height: 130px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    border: 1px solid rgba(110,231,255,.12);
+    box-shadow: inset 0 2px 18px rgba(0,0,0,.6);
+    overflow: hidden;
+  }
+  .screen .hint {
+    color: var(--muted);
+    font-size: 12px;
+    min-height: 16px;
+    margin-bottom: 6px;
+  }
+  .screen .entry {
+    color: var(--text);
+    font-size: 26px;
+    font-weight: 500;
+    word-break: break-all;
+    line-height: 1.25;
+    min-height: 34px;
+    font-family: "SF Mono", "Consolas", monospace;
+  }
+  .screen .entry .caret {
+    display: inline-block;
+    width: 2px;
+    height: 26px;
+    background: var(--accent);
+    margin-left: 1px;
+    vertical-align: -4px;
+    animation: blink 1s steps(1) infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  .screen .result {
+    color: var(--act);
+    font-size: 30px;
+    font-weight: 700;
+    text-align: right;
+    word-break: break-all;
+    line-height: 1.2;
+    margin-top: 8px;
+    min-height: 36px;
+    font-family: "SF Mono", "Consolas", monospace;
+  }
+  .screen .result.error { color: var(--clr); font-size: 18px; font-weight: 500; }
+
+  /* ---- Buttons ---- */
+  .pad { margin-top: 16px; display: grid; gap: 9px; }
+  .row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px; }
+  .row.fns { grid-template-columns: repeat(3, 1fr); }
+
+  button {
+    border: none;
+    border-radius: 14px;
+    padding: 16px 0;
+    font-size: 19px;
+    font-weight: 600;
+    color: var(--text);
+    background: var(--num);
+    cursor: pointer;
+    transition: transform .05s ease, background .15s ease, box-shadow .15s ease;
+    box-shadow: 0 3px 0 rgba(0,0,0,.25);
+    user-select: none;
+  }
+  button:hover  { background: var(--num-hi); }
+  button:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,.25); }
+
+  button.op  { background: var(--op);  color:#1b1f2a; }
+  button.op:hover  { background: var(--op-hi); }
+  button.fn  { background: var(--fn);  font-size: 15px; }
+  button.fn:hover  { background: var(--fn-hi); }
+  button.act { background: var(--act); color:#08231b; }
+  button.act:hover { background: var(--act-hi); }
+  button.clr { background: var(--clr); }
+  button.clr:hover { background:#f6614f; }
+  button.wide { grid-column: span 2; }
+  button.equals { background: var(--act); color:#08231b; }
+
+  .fn-label { font-size: 11px; color: var(--muted); margin: 6px 4px 2px; letter-spacing: 1px; text-transform: uppercase; }
+
+  .loading {
+    color: var(--op);
+    font-size: 12px;
+    text-align: center;
+    margin-top: 10px;
+    min-height: 14px;
+  }
+</style>
+</head>
+<body>
+
+<div class="calculator">
+  <div class="brand"><span>Wafflez <b>Algebra</b></span><span>v2.0</span></div>
+
+  <!-- Display -->
+  <div class="screen">
+    <div class="hint" id="hint">Type an equation, then press =</div>
+    <div class="entry" id="entry"><span class="caret"></span></div>
+    <div class="result" id="result"></div>
+  </div>
+
+  <div class="loading" id="loading">Loading math engine…</div>
+
+  <!-- Symbolic-operation buttons (clearly labeled) -->
+  <div class="fn-label">Algebra &amp; Calculus</div>
+  <div class="pad">
+    <div class="row fns">
+      <button class="fn" onclick="act('solve')">Solve for x</button>
+      <button class="fn" onclick="act('factor')">Factor</button>
+      <button class="fn" onclick="act('expand')">Expand</button>
+    </div>
+    <div class="row fns">
+      <button class="fn" onclick="act('simplify')">Simplify</button>
+      <button class="fn" onclick="act('derivative')">d/dx</button>
+      <button class="fn" onclick="act('integral')">∫ dx</button>
+    </div>
+  </div>
+
+  <!-- Scientific functions -->
+  <div class="fn-label">Functions</div>
+  <div class="pad">
+    <div class="row">
+      <button class="fn" onclick="ins('sqrt(')">√</button>
+      <button class="fn" onclick="ins('^')">x^y</button>
+      <button class="fn" onclick="ins('sin(')">sin</button>
+      <button class="fn" onclick="ins('cos(')">cos</button>
+    </div>
+    <div class="row">
+      <button class="fn" onclick="ins('tan(')">tan</button>
+      <button class="fn" onclick="ins('log(')">log</button>
+      <button class="fn" onclick="ins('pi')">π</button>
+      <button class="fn" onclick="ins('x')">x</button>
+    </div>
+  </div>
+
+  <!-- Number pad -->
+  <div class="fn-label">Keypad</div>
+  <div class="pad">
+    <div class="row">
+      <button class="clr" onclick="clearAll()">C</button>
+      <button onclick="ins('(')">(</button>
+      <button onclick="ins(')')">)</button>
+      <button class="op" onclick="ins('/')">÷</button>
+    </div>
+    <div class="row">
+      <button onclick="ins('7')">7</button>
+      <button onclick="ins('8')">8</button>
+      <button onclick="ins('9')">9</button>
+      <button class="op" onclick="ins('*')">×</button>
+    </div>
+    <div class="row">
+      <button onclick="ins('4')">4</button>
+      <button onclick="ins('5')">5</button>
+      <button onclick="ins('6')">6</button>
+      <button class="op" onclick="ins('-')">−</button>
+    </div>
+    <div class="row">
+      <button onclick="ins('1')">1</button>
+      <button onclick="ins('2')">2</button>
+      <button onclick="ins('3')">3</button>
+      <button class="op" onclick="ins('+')">+</button>
+    </div>
+    <div class="row">
+      <button onclick="ins('0')">0</button>
+      <button onclick="ins('.')">.</button>
+      <button onclick="ins('=')">=</button>
+      <button onclick="backspace()">⌫</button>
+    </div>
+    <div class="row">
+      <button class="equals wide" onclick="evaluate()">= Answer</button>
+      <button class="op wide" onclick="ins('x')">Insert x</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ------------------------------------------------------------------
+// State + display
+// ------------------------------------------------------------------
+let expr = "";
+const entryEl  = document.getElementById("entry");
+const resultEl = document.getElementById("result");
+const hintEl   = document.getElementById("hint");
+const loadEl   = document.getElementById("loading");
+
+function render() {
+  entryEl.innerHTML = (expr ? escapeHtml(expr) : "") + '<span class="caret"></span>';
+}
+function escapeHtml(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+function showResult(text, isError) {
+  resultEl.textContent = text;
+  resultEl.classList.toggle("error", !!isError);
+}
+
+// ------------------------------------------------------------------
+// Input handling
+// ------------------------------------------------------------------
+function ins(s){ expr += s; render(); showResult(""); }
+function backspace(){ expr = expr.slice(0, -1); render(); }
+function clearAll(){ expr = ""; render(); showResult(""); hintEl.textContent = "Type an equation, then press ="; }
+
+// Convert the friendly display string into engine syntax
+function normalize(s){
+  return s.replace(/×/g,"*").replace(/÷/g,"/").replace(/−/g,"-").replace(/π/g,"pi");
+}
+
+// ------------------------------------------------------------------
+// Engine availability
+// ------------------------------------------------------------------
+function engineReady(){ return typeof nerdamer !== "undefined"; }
+
+window.addEventListener("load", () => {
+  if (engineReady()) {
+    loadEl.textContent = "✓ Ready";
+    setTimeout(()=> loadEl.textContent = "", 1200);
+  } else {
+    loadEl.textContent = "⚠ Math engine failed to load — check your internet connection.";
+  }
+});
+
+// ------------------------------------------------------------------
+// Core evaluation
+// ------------------------------------------------------------------
+function evaluate(){
+  const raw = normalize(expr).trim();
+  if (!raw){ showResult(""); return; }
+  if (!engineReady()){ showResult("Math engine not loaded", true); return; }
+
+  try {
+    let out;
+    // Equation? -> solve for x automatically
+    if (raw.includes("=")){
+      const sides = raw.split("=");
+      const eqn = sides[0] + "=" + sides.slice(1).join("=");
+      const sol = nerdamer.solve(eqn, "x");
+      out = formatSolutions(sol);
+      hintEl.textContent = "solved for x";
+    } else {
+      // Plain expression -> exact value (keeps fractions), then simplify
+      const sym = nerdamer(raw);
+      let exact = sym.evaluate().toString();
+      // also offer a decimal if it differs and is numeric
+      let dec = "";
+      try {
+        const d = Number(nerdamer(raw).evaluate().text("decimals"));
+        if (!isNaN(d) && d.toString() !== exact) dec = "  ≈ " + round(d);
+      } catch(e){}
+      out = pretty(exact) + dec;
+      hintEl.textContent = "result";
+    }
+    showResult(out);
+  } catch (err){
+    showResult(friendlyError(err), true);
+  }
+}
+
+// Named symbolic operations
+function act(kind){
+  let raw = normalize(expr).trim();
+  if (!raw){ showResult("Enter an expression first", true); return; }
+  if (!engineReady()){ showResult("Math engine not loaded", true); return; }
+
+  try {
+    let out;
+    switch(kind){
+      case "solve": {
+        const eqn = raw.includes("=") ? raw : raw + "=0";
+        out = formatSolutions(nerdamer.solve(eqn, "x"));
+        hintEl.textContent = "solve for x";
+        break;
+      }
+      case "factor":
+        out = pretty(nerdamer.factor(raw).toString());
+        hintEl.textContent = "factored";
+        break;
+      case "expand":
+        out = pretty(nerdamer(`expand(${raw})`).toString());
+        hintEl.textContent = "expanded";
+        break;
+      case "simplify":
+        out = pretty(nerdamer(`simplify(${raw})`).toString());
+        hintEl.textContent = "simplified";
+        break;
+      case "derivative":
+        out = pretty(nerdamer(`diff(${raw}, x)`).toString());
+        hintEl.textContent = "d/dx";
+        break;
+      case "integral":
+        out = pretty(nerdamer(`integrate(${raw}, x)`).toString()) + " + C";
+        hintEl.textContent = "∫ dx";
+        break;
+    }
+    showResult(out);
+  } catch (err){
+    showResult(friendlyError(err), true);
+  }
+}
+
+// ------------------------------------------------------------------
+// Formatting helpers
+// ------------------------------------------------------------------
+function formatSolutions(sol){
+  let arr;
+  try { arr = sol.symbol ? sol.symbol : sol; } catch(e){ arr = sol; }
+  let s = sol.toString();
+  // nerdamer returns like "[2,3]" for multiple roots
+  s = s.replace(/^\[/,"").replace(/\]$/,"");
+  const parts = s.split(",").map(p => p.trim()).filter(Boolean);
+  if (parts.length === 0) return "no solution";
+  if (parts.length === 1) return "x = " + pretty(parts[0]);
+  return parts.map((p,i) => "x" + sub(i+1) + " = " + pretty(p)).join("   ");
+}
+
+function pretty(s){
+  return String(s)
+    .replace(/\*\*/g,"^")
+    .replace(/\*/g,"·")
+    .replace(/sqrt/g,"√")
+    .replace(/pi/g,"π");
+}
+function sub(n){ const m={1:"₁",2:"₂",3:"₃",4:"₄",5:"₅"}; return m[n]||""; }
+function round(d){ return Math.round(d*1e10)/1e10; }
+
+function friendlyError(err){
+  const m = (err && err.message) ? err.message : String(err);
+  if (/bracket|parenthes|unmatched/i.test(m)) return "Check your parentheses";
+  if (/Unexpected|parse|token/i.test(m))      return "Can't read that expression";
+  if (/division|divide/i.test(m))             return "Division by zero";
+  return "Error: " + m;
+}
+
+// ------------------------------------------------------------------
+// Physical keyboard support
+// ------------------------------------------------------------------
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Enter"){ e.preventDefault(); evaluate(); return; }
+  if (e.key === "Backspace"){ e.preventDefault(); backspace(); return; }
+  if (e.key === "Escape"){ clearAll(); return; }
+  if (e.key.length === 1 && /[0-9a-zA-Z+\-*/^().= ]/.test(e.key)){
+    ins(e.key);
+  }
+});
+
+render();
+</script>
+</body>
+</html>
