@@ -3,4 +3,5 @@ node_modules
 .DS_Store
 .hintrc
 .gitpod.yml 
-.env
+.env__pycache__/
+*.pyc
